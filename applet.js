@@ -83,6 +83,10 @@ Homestead.prototype = {
 		}
 	},
 
+	testReturn: function() {
+		global.log('Returned from async!');
+	},
+
 	unPause: function() {
 		global.log('Unpausing');
 		Mainloop.source_remove(this._status_pause);
@@ -170,6 +174,11 @@ Rancher.prototype = {
 		return newItem;
 	},
 
+	newSwitchMenuItem: function(label) {
+		let newItem = new PopupMenu.PopupSwitchMenuItem(label);
+		return newItem;
+	},
+
 	newSeparator: function() {
 		return new PopupMenu.PopupSeparatorMenuItem();
 	},
@@ -184,6 +193,7 @@ Rancher.prototype = {
 			if (this.homestead.isUp()) {
 				this.menu.addMenuItem(this.newMenuItem('Status: Up', null, {reactive: false}));
 				this.menu.addMenuItem(this.newSeparator());
+				this.menu.addMenuItem(this.newSwitchMenuItem('Testing!'));
 				this.menu.addMenuItem(this.newMenuItem('Run provisioning', this.homesteadProvision));
 				this.menu.addMenuItem(this.newMenuItem('Suspend Homestead', this.homesteadSuspend));
 				this.menu.addMenuItem(this.newMenuItem('Halt Homestead', this.homesteadHalt));
