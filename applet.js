@@ -72,7 +72,13 @@ Homestead.prototype = {
 				return this._up;
 			}
 
-			let [res, list, err, status] = GLib.spawn_sync(HOMESTEAD_PROJECT_FOLDER, [VAGRANT_CMD, 'status'], null, GLib.SpawnFlags.DEFAULT, null);
+			let [res, list, err, status] = GLib.spawn_sync(
+				HOMESTEAD_PROJECT_FOLDER, 
+				[VAGRANT_CMD, 'status'], 
+				null, 
+				GLib.SpawnFlags.DEFAULT, 
+				null
+			);
 			let reStatus = new RegExp('running');
 			this._up = reStatus.test(list);
 			this._status_pause = Mainloop.timeout_add(5, this.unPause);
@@ -174,8 +180,11 @@ Rancher.prototype = {
 		return newItem;
 	},
 
-	newSwitchMenuItem: function(label) {
-		let newItem = new PopupMenu.PopupSwitchMenuItem(label);
+	newSwitchMenuItem: function(label, state, callback) {
+		let newItem = new PopupMenu.PopupSwitchMenuItem(label, state);
+		if (callback) {
+			newItem.connect("activate", Lang.bind(this, callback));
+		}
 		return newItem;
 	},
 
@@ -190,18 +199,12 @@ Rancher.prototype = {
 				this.menu.addMenuItem(this.newMenuItem('Homestead missing or not configured', null, {reactive: false}));
 				return false;
 			}
+			this.menu.addMenuItem(this.newSwitchMenuItem('Status', this.homestead.isUp(), this.homesteadToggle));
+			this.menu.addMenuItem(this.newSeparator());
 			if (this.homestead.isUp()) {
-				this.menu.addMenuItem(this.newMenuItem('Status: Up', null, {reactive: false}));
-				this.menu.addMenuItem(this.newSeparator());
-				this.menu.addMenuItem(this.newSwitchMenuItem('Testing!'));
 				this.menu.addMenuItem(this.newMenuItem('Run provisioning', this.homesteadProvision));
 				this.menu.addMenuItem(this.newMenuItem('Suspend Homestead', this.homesteadSuspend));
-				this.menu.addMenuItem(this.newMenuItem('Halt Homestead', this.homesteadHalt));
 				this.menu.addMenuItem(this.newMenuItem('SSH Terminal', this.homesteadSSH));
-			} else {
-				this.menu.addMenuItem(this.newMenuItem('Status: Down', null, {reactive: false}));
-				this.menu.addMenuItem(this.newSeparator());
-				this.menu.addMenuItem(this.newMenuItem('Start Homestead', this.homesteadUp));
 			}
 			this.menu.addMenuItem(this.newMenuItem('Destroy Homestead', this.homesteadDestroy));
 			this.menu.addMenuItem(this.newSeparator());
@@ -228,8 +231,24 @@ Rancher.prototype = {
 	},
 
 	refreshApplet: function() {
+		this.homestead.isUp(true);
 		this.updateMenu();
 		this.updateAppletIcon();
+	},
+
+	objectSniff: function(object_sniff) {
+		var keys = Object.keys(object_sniff);
+		for (var i=0; i < keys.length; i++) {
+			global.log(keys[i]);
+		}
+	},
+
+	homesteadToggle: function(event) {
+		if (event._switch.state) {
+			this.homesteadUp();
+			return true;
+		}
+		this.homesteadHalt();
 	},
 
 	homesteadProvision: function() {
