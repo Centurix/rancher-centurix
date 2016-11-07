@@ -73,17 +73,31 @@ Homestead.prototype = {
 				global.log('Paused, returning: ' + this._up);
 				return this._up;
 			}
-
-			let [res, list, err, status] = GLib.spawn_sync(
-				HOMESTEAD_PROJECT_FOLDER, 
-				[VAGRANT_CMD, 'status'], 
-				null, 
-				GLib.SpawnFlags.DEFAULT, 
+			let [success, pid] = GLib.spawn_async(
+				HOMESTEAD_PROJECT_FOLDER,
+				[VAGRANT_CMD, 'status'],
+				null,
+				GLib.SpawnFlags.DEFAULT | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
 				null
 			);
-			let reStatus = new RegExp('running');
-			this._up = reStatus.test(list);
-			this._status_pause = Mainloop.timeout_add(5, this.unPause);
+			global.log('PID: ' + pid);
+			// this.source = GLib.child_watch_source_new(pid);
+			let test = GLib.child_watch_add(
+				GLib.PRIORITY_DEFAULT,
+				pid,
+				Lang.bind(this, this.testReturn),
+				'123'
+			);
+			// let [res, list, err, status] = GLib.spawn_sync(
+			// 	HOMESTEAD_PROJECT_FOLDER, 
+			// 	[VAGRANT_CMD, 'status'], 
+			// 	null, 
+			// 	GLib.SpawnFlags.DEFAULT, 
+			// 	null
+			// );
+			// let reStatus = new RegExp('running');
+			// this._up = reStatus.test(list);
+			// this._status_pause = Mainloop.timeout_add(5, this.unPause);
 
 			return this._up;
 		} catch(e) {
@@ -91,7 +105,11 @@ Homestead.prototype = {
 		}
 	},
 
-	testReturn: function() {
+	testReturn: function(pid, status) {
+		for (var i=0; i < arguments.length; i++) {
+			global.log(i + ":" + arguments[i]);
+		}
+		GLib.spawn_close_pid(pid);
 		global.log('Returned from async!');
 	},
 
@@ -104,7 +122,8 @@ Homestead.prototype = {
 	vagrantExec: function(command, option = '') {
 		global.log('Executing command: ' + command);
 		try {
-			GLib.spawn_sync(HOMESTEAD_PROJECT_FOLDER, [VAGRANT_CMD, command, option], null, GLib.SpawnFlags.DEFAULT, null);
+			GLib.spawn_async(HOMESTEAD_PROJECT_FOLDER, [VAGRANT_CMD, command, option], null, GLib.SpawnFlags.DEFAULT, null);
+			// GLib.spawn_sync(HOMESTEAD_PROJECT_FOLDER, [VAGRANT_CMD, command, option], null, GLib.SpawnFlags.DEFAULT, null);
 		} catch(e) {
 			global.log(UUID + "::exec(" + command + "): " + e);
 		}
@@ -141,7 +160,8 @@ Homestead.prototype = {
 	edit: function() {
 		global.log('Editing Homestead configuration');
 		try {
-			GLib.spawn_sync(HOMESTEAD_CONFIG_FOLDER, [EDITOR, HOMESTEAD_CONFIG_FOLDER + 'Homestead.yaml'], null, GLib.SpawnFlags.DEFAULT, null);
+			GLib.spawn_async(HOMESTEAD_CONFIG_FOLDER, [EDITOR, HOMESTEAD_CONFIG_FOLDER + 'Homestead.yaml'], null, GLib.SpawnFlags.DEFAULT, null);
+			// GLib.spawn_sync(HOMESTEAD_CONFIG_FOLDER, [EDITOR, HOMESTEAD_CONFIG_FOLDER + 'Homestead.yaml'], null, GLib.SpawnFlags.DEFAULT, null);
 		} catch(e) {
 			global.log(UUID + "::edit: " + e);
 		}		
