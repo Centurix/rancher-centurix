@@ -21,6 +21,7 @@ Usage
 TODO
 ----
 
+* Fix the callbacks from the async calls to check status
 * Make calls async with callbacks
 * Improve vagrant status check speed
 * Check for box updates
@@ -32,3 +33,9 @@ TODO
 * Select the correct size icon for the size of the taskbar
 * Add more exception handling
 * See if we can add unit testing for builds
+* Tidy up the terminal_reader.js output to remove extra stuff
+* Refactor
+* Add confirmation for destroy
+* List sites hosted in the box
+* List memory, IP address, CPUs and the VM provider
+* List databases used

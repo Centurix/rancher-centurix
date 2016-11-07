@@ -5,6 +5,8 @@ const GLib = imports.gi.GLib;
 const Mainloop = imports.mainloop;
 const Settings = imports.ui.settings;
 const Gtk = imports.gi.Gtk;
+const Gio = imports.gi.Gio;
+const TerminalReader = imports.applet.terminal_reader;
 
 const UUID = "rancher@centurix";
 
@@ -12,8 +14,8 @@ const APPLET_FOLDER = global.userdatadir + "/applets/rancher@centurix/";
 
 const HOME = GLib.get_home_dir();
 
-const HOMESTEAD_PROJECT_FOLDER = HOME + "/Homestead/";
-const HOMESTEAD_CONFIG_FOLDER = HOME + "/.homestead/";
+const HOMESTEAD_PROJECT_FOLDER = HOME + "/Homestead";
+const HOMESTEAD_CONFIG_FOLDER = HOME + "/.homestead";
 
 const ICON_UP = APPLET_FOLDER + "icons/laravel_up_128x128.png";
 const ICON_DOWN = APPLET_FOLDER + "icons/laravel_down_128x128.png";
@@ -22,6 +24,11 @@ const ICON_MISSING = APPLET_FOLDER + "icons/laravel_missing_128x128.png";
 const VAGRANT_CMD = '/usr/bin/vagrant';
 
 const EDITOR = '/usr/bin/xed';
+
+const STATUS_RUNNING = 0;
+const STATUS_SAVED = 1;
+const STATUS_POWER_OFF = 2;
+const STATUS_NOT_CREATED = 3;
 
 /**
  * Homestead/Vagrant manager
@@ -34,6 +41,7 @@ Homestead.prototype = {
 	_init: function() {
 		this._up = null;
 		this._status_pause = null;
+		this._out = {};
 	},
 
 	checkProjectExists: function() {
@@ -65,96 +73,87 @@ Homestead.prototype = {
 		return this.checkProjectExists() && this.checkConfigExists() && this.checkVagrantExists();
 	},
 
-	isUp: function(forceCheck = false) {
+	checkStatus: function(callback) {
+		this._callback = callback;
 		try {
-			global.log('Running a status check');
+			reader = new TerminalReader.TerminalReader(HOMESTEAD_PROJECT_FOLDER, VAGRANT_CMD + ' status', Lang.bind(this, function (command, status, stdout) {
+				reader.destroy();
+				if (new RegExp('running').test(stdout)) {
+					this._callback(this.exists(), STATUS_RUNNING);
+				}
+				if (new RegExp('saved').test(stdout)) {
+					this._callback(this.exists(), STATUS_SAVED);
+				}
+				if (new RegExp('poweroff').test(stdout)) {
+					this._callback(this.exists(), STATUS_POWER_OFF);
+				}
+				if (new RegExp('not created').test(stdout)) {
+					this._callback(this.exists(), STATUS_NOT_CREATED);
+				}
+			}));
+			reader.executeReader();
+		} catch (e) {
+			global.log(e);
+		}
+	},
 
-			if (this._status_pause != null && this._up != null && !forceCheck) {
-				global.log('Paused, returning: ' + this._up);
-				return this._up;
-			}
-			let [success, pid] = GLib.spawn_async(
+	vagrantExec: function(command, callback = null) {
+		this._callback = callback;
+		global.log('Executing command: ' + [VAGRANT_CMD].concat(command));
+		try {
+			let [exit, pid, stdin, stdout, stderr] = GLib.spawn_async_with_pipes(
 				HOMESTEAD_PROJECT_FOLDER,
-				[VAGRANT_CMD, 'status'],
+				[VAGRANT_CMD].concat(command),
 				null,
-				GLib.SpawnFlags.DEFAULT | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+				GLib.SpawnFlags.DO_NOT_REAP_CHILD,
 				null
-			);
-			global.log('PID: ' + pid);
-			// this.source = GLib.child_watch_source_new(pid);
-			let test = GLib.child_watch_add(
+			); 
+			this._watch = GLib.child_watch_add(
 				GLib.PRIORITY_DEFAULT,
 				pid,
-				Lang.bind(this, this.testReturn),
-				'123'
+				Lang.bind(this, function(pid, status, requestObj) {
+					GLib.source_remove(this._watch);
+					if (this._callback) {
+						this._callback();
+					}
+				})
 			);
-			// let [res, list, err, status] = GLib.spawn_sync(
-			// 	HOMESTEAD_PROJECT_FOLDER, 
-			// 	[VAGRANT_CMD, 'status'], 
-			// 	null, 
-			// 	GLib.SpawnFlags.DEFAULT, 
-			// 	null
-			// );
-			// let reStatus = new RegExp('running');
-			// this._up = reStatus.test(list);
-			// this._status_pause = Mainloop.timeout_add(5, this.unPause);
-
-			return this._up;
-		} catch(e) {
-			global.log(UUID + "::isUp: " + e);
-		}
-	},
-
-	testReturn: function(pid, status) {
-		for (var i=0; i < arguments.length; i++) {
-			global.log(i + ":" + arguments[i]);
-		}
-		GLib.spawn_close_pid(pid);
-		global.log('Returned from async!');
-	},
-
-	unPause: function() {
-		global.log('Unpausing');
-		Mainloop.source_remove(this._status_pause);
-		this._status_pause = null;
-	},
-
-	vagrantExec: function(command, option = '') {
-		global.log('Executing command: ' + command);
-		try {
-			GLib.spawn_async(HOMESTEAD_PROJECT_FOLDER, [VAGRANT_CMD, command, option], null, GLib.SpawnFlags.DEFAULT, null);
-			// GLib.spawn_sync(HOMESTEAD_PROJECT_FOLDER, [VAGRANT_CMD, command, option], null, GLib.SpawnFlags.DEFAULT, null);
 		} catch(e) {
 			global.log(UUID + "::exec(" + command + "): " + e);
 		}
 	},
 
-	up: function() {
-		this.vagrantExec('up');
-		this.isUp(true);
+	up: function(callback) {
+		this.vagrantExec(['up'], function() {
+			global.log('Calling callback');
+			this.checkStatus(callback);
+		});
 	},
 
-	halt: function() {
-		this.vagrantExec('halt');
-		this.isUp(true);
+	halt: function(callback) {
+		this.vagrantExec(['halt'], Lang.bind(this, function() {
+			this.checkStatus(callback);
+		}));
 	},
 
-	destroy: function() {
-		this.vagrantExec('destroy', '--force');
-		this.isUp(true);
+	destroy: function(callback) {
+		this.vagrantExec(['destroy', '--force'], Lang.bind(this, function() {
+			this.checkStatus(callback);
+		}));
 	},
 
-	suspend: function() {
-		this.vagrantExec('suspend');
-		this.isUp(true);
+	suspend: function(callback) {
+		this.vagrantExec(['suspend'], Lang.bind(this, function() {
+			this.checkStatus(callback);
+		}));
 	},
 
 	provision: function() {
-		this.vagrantExec('provision');
+		this.vagrantExec(['provision']);
 	},
 
 	ssh: function() {
-		this.vagrantExec('ssh');
+		this.vagrantExec(['ssh']);
 	},
 
 	edit: function() {
@@ -223,32 +222,6 @@ Rancher.prototype = {
 		return new PopupMenu.PopupSeparatorMenuItem();
 	},
 
-	updateMenu: function() {
-		try {
-			this.menu.removeAll();
-			if (!this.homestead.exists()) {
-				this.menu.addMenuItem(this.newMenuItem(_('Homestead missing or not configured'), null, {reactive: false}));
-				return false;
-			}
-			this.menu.addMenuItem(this.newSwitchMenuItem(_('Status'), this.homestead.isUp(), this.homesteadToggle));
-			this.menu.addMenuItem(this.newSeparator());
-			if (this.homestead.isUp()) {
-				this.menu.addMenuItem(this.newMenuItem(_('Run provisioning'), this.homesteadProvision));
-				this.menu.addMenuItem(this.newMenuItem(_('Suspend Homestead'), this.homesteadSuspend));
-				this.menu.addMenuItem(this.newMenuItem(_('SSH Terminal'), this.homesteadSSH));
-			}
-			this.menu.addMenuItem(this.newMenuItem(_('Destroy Homestead'), this.homesteadDestroy));
-			this.menu.addMenuItem(this.newSeparator());
-			this.menu.addMenuItem(this.newMenuItem(_('Edit Homestead configuration'), this.editHomestead));
-			this.menu.addMenuItem(this.newMenuItem(_('Update Homestead box'), null, {reactive: false}));
-			this.menu.addMenuItem(this.newSeparator());
-			this.menu.addMenuItem(this.newMenuItem(_('Refresh this menu'), this.refreshApplet));
-
-		} catch(e) {
-			global.log(UUID + "::updateMenu: " + e);
-		}
-	},
-
 	settingsApiCheck: function() {
 		const Config = imports.misc.config;
 		const SETTINGS_API_MIN_VERSION = 2;
@@ -258,7 +231,6 @@ Rancher.prototype = {
 		let majorVersion = parseInt(cinnamonVersion[0]);
 
 		if (majorVersion >= SETTINGS_API_MIN_VERSION) {
-			global.log('EXITING');
 			return;
 		}
 
@@ -282,12 +254,6 @@ Rancher.prototype = {
 		// this.homestead.edit();
 	},
 
-	refreshApplet: function() {
-		this.homestead.isUp(true);
-		this.updateMenu();
-		this.updateAppletIcon();
-	},
-
 	objectSniff: function(object_sniff) {
 		var keys = Object.keys(object_sniff);
 		for (var i=0; i < keys.length; i++) {
@@ -297,10 +263,10 @@ Rancher.prototype = {
 
 	homesteadToggle: function(event) {
 		if (event._switch.state) {
-			this.homesteadUp();
+			this.homesteadUp(Lang.bind(this, this.updateApplet));
 			return true;
 		}
-		this.homesteadHalt();
+		this.homesteadHalt(Lang.bind(this, this.updateApplet));
 	},
 
 	homesteadProvision: function() {
@@ -308,46 +274,78 @@ Rancher.prototype = {
 	},
 
 	homesteadDestroy: function() {
-		this.homestead.destroy();
-		this.refreshApplet();
+		this.homestead.destroy(this.updateApplet);
 	},
 
 	homesteadUp: function() {
-		this.homestead.up();
-		this.refreshApplet();
+		this.homestead.up(this.updateApplet);
 	},
 
 	homesteadSuspend: function() {
-		this.homestead.suspend();
-		this.refreshApplet();
+		this.homestead.suspend(this.updateApplet);
 	},
 
 	homesteadHalt: function() {
-		this.homestead.halt();
-		this.refreshApplet();
+		this.homestead.halt(this.updateApplet);
 	},
 
 	homesteadSSH: function() {
 		this.homestead.ssh();
 	},
 
-	updateAppletIcon: function() {
-		if (!this.homestead.exists()) {
+	refreshApplet: function() {
+		this.homestead.checkStatus(Lang.bind(this, this.updateApplet));
+	},
+
+	updateApplet: function(exists, status) {
+		global.log(exists);
+		global.log(status);
+		if (!exists) {
 			this.set_applet_icon_path(ICON_MISSING);
 			this.set_applet_tooltip(_("Rancher: Homestead missing or not configured."));
-			return true;
 		}
 
-		if (!this.homestead.isUp()) {
-			this.set_applet_icon_path(ICON_DOWN);
+		this.set_applet_icon_path(ICON_DOWN);
+
+		if (status == STATUS_RUNNING) {
+			this.set_applet_icon_path(ICON_UP);
+			this.set_applet_tooltip(_("Rancher: Homestead up."));
+		}
+
+		if (status == STATUS_SAVED) {
+			this.set_applet_tooltip(_("Rancher: Homestead suspended."));
+		}
+		if (status == STATUS_POWER_OFF) {
 			this.set_applet_tooltip(_("Rancher: Homestead down."));
-			return true;
 		}
-		this.set_applet_icon_path(ICON_UP);
-		this.set_applet_tooltip(_("Rancher: Homestead up."));
-		return true;
-	}
+		if (status == STATUS_NOT_CREATED) {
+			this.set_applet_tooltip(_("Rancher: Homestead not created."));
+		}
 
+		try {
+			this.menu.removeAll();
+			if (!exists) {
+				this.menu.addMenuItem(this.newMenuItem(_('Homestead missing or not configured'), null, {reactive: false}));
+				return false;
+			}
+			this.menu.addMenuItem(this.newSwitchMenuItem(_('Status'), (status == STATUS_RUNNING), this.homesteadToggle));
+			this.menu.addMenuItem(this.newSeparator());
+			if (status == STATUS_RUNNING) {
+				this.menu.addMenuItem(this.newMenuItem(_('Run provisioning'), this.homesteadProvision));
+				this.menu.addMenuItem(this.newMenuItem(_('Suspend Homestead'), this.homesteadSuspend));
+				this.menu.addMenuItem(this.newMenuItem(_('SSH Terminal'), this.homesteadSSH));
+			}
+			this.menu.addMenuItem(this.newMenuItem(_('Destroy Homestead'), this.homesteadDestroy));
+			this.menu.addMenuItem(this.newSeparator());
+			this.menu.addMenuItem(this.newMenuItem(_('Edit Homestead configuration'), this.editHomestead));
+			this.menu.addMenuItem(this.newMenuItem(_('Update Homestead box'), null, {reactive: false}));
+			this.menu.addMenuItem(this.newSeparator());
+			this.menu.addMenuItem(this.newMenuItem(_('Refresh this menu'), this.refreshApplet));
+
+		} catch(e) {
+			global.log(UUID + "::updateMenu: " + e);
+		}
+	}
 }
 
 /**
