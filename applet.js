@@ -3,6 +3,8 @@ const PopupMenu = imports.ui.popupMenu;
 const Lang = imports.lang;
 const GLib = imports.gi.GLib;
 const Mainloop = imports.mainloop;
+const Settings = imports.ui.settings;
+const Gtk = imports.gi.Gtk;
 
 const UUID = "rancher@centurix";
 
@@ -151,6 +153,7 @@ Homestead.prototype = {
  * Applet manager
  **/
 function Rancher(metadata, orientation, panelHeight, instanceId) {
+	this.settings = new Settings.AppletSettings(this, UUID, instanceId);
 	this._init(orientation, panelHeight, instanceId);
 }
 
@@ -164,6 +167,14 @@ Rancher.prototype = {
 			this.menu = new Applet.AppletPopupMenu(this, orientation);
 			this._menuManager.addMenu(this.menu);
 
+			// this.settings.bindProperty(
+			// 	Settings.BindingDirection.IN, 
+			// 	KEY_UPDATE,
+			// 	AUTOUPDATE,
+			// 	this.onSwitchAutoUpdate, 
+			// 	null
+			// );
+			this.settingsApiCheck();
 			this.homestead = new Homestead();
 
 			this.refreshApplet();
@@ -196,31 +207,52 @@ Rancher.prototype = {
 		try {
 			this.menu.removeAll();
 			if (!this.homestead.exists()) {
-				this.menu.addMenuItem(this.newMenuItem('Homestead missing or not configured', null, {reactive: false}));
+				this.menu.addMenuItem(this.newMenuItem(_('Homestead missing or not configured'), null, {reactive: false}));
 				return false;
 			}
-			this.menu.addMenuItem(this.newSwitchMenuItem('Status', this.homestead.isUp(), this.homesteadToggle));
+			this.menu.addMenuItem(this.newSwitchMenuItem(_('Status'), this.homestead.isUp(), this.homesteadToggle));
 			this.menu.addMenuItem(this.newSeparator());
 			if (this.homestead.isUp()) {
-				this.menu.addMenuItem(this.newMenuItem('Run provisioning', this.homesteadProvision));
-				this.menu.addMenuItem(this.newMenuItem('Suspend Homestead', this.homesteadSuspend));
-				this.menu.addMenuItem(this.newMenuItem('SSH Terminal', this.homesteadSSH));
+				this.menu.addMenuItem(this.newMenuItem(_('Run provisioning'), this.homesteadProvision));
+				this.menu.addMenuItem(this.newMenuItem(_('Suspend Homestead'), this.homesteadSuspend));
+				this.menu.addMenuItem(this.newMenuItem(_('SSH Terminal'), this.homesteadSSH));
 			}
-			this.menu.addMenuItem(this.newMenuItem('Destroy Homestead', this.homesteadDestroy));
+			this.menu.addMenuItem(this.newMenuItem(_('Destroy Homestead'), this.homesteadDestroy));
 			this.menu.addMenuItem(this.newSeparator());
-			this.menu.addMenuItem(this.newMenuItem('Edit Homestead configuration', this.editHomestead));
-			this.menu.addMenuItem(this.newMenuItem('Update Homestead box', null, {reactive: false}));
+			this.menu.addMenuItem(this.newMenuItem(_('Edit Homestead configuration'), this.editHomestead));
+			this.menu.addMenuItem(this.newMenuItem(_('Update Homestead box'), null, {reactive: false}));
 			this.menu.addMenuItem(this.newSeparator());
-			this.menu.addMenuItem(this.newMenuItem('Refresh this menu', this.refreshApplet));
+			this.menu.addMenuItem(this.newMenuItem(_('Refresh this menu'), this.refreshApplet));
 
 		} catch(e) {
 			global.log(UUID + "::updateMenu: " + e);
 		}
 	},
 
+	settingsApiCheck: function() {
+		const Config = imports.misc.config;
+		const SETTINGS_API_MIN_VERSION = 2;
+		const CMD_SETTINGS = "cinnamon-settings applets " + UUID;
+
+		let cinnamonVersion = Config.PACKAGE_VERSION.split('.');
+		let majorVersion = parseInt(cinnamonVersion[0]);
+
+		if (majorVersion >= SETTINGS_API_MIN_VERSION) {
+			global.log('EXITING');
+			return;
+		}
+
+		let mi = new Applet.MenuItem(_("Settings"), Gtk.STOCK_EDIT, Lang.bind(this, function() {
+			Util.spawnCommandLine(CMD_SETTINGS)
+		}));
+		this._applet_context_menu.addMenuItem(mi);
+	},
+
 	on_applet_clicked: function(event) {
 		try {
-			this.menu.toggle();
+			if (!this.menu.isOpen) {
+				this.menu.toggle();
+			}
 		} catch(e) {
 			global.log(UUID + '::on_applet_clicked: ' + e);
 		}
