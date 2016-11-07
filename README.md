@@ -32,3 +32,4 @@ TODO
 * Select the correct size icon for the size of the taskbar
 * Add more exception handling
 * See if we can add unit testing for builds
+* Add translations
