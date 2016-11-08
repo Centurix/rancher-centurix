@@ -157,6 +157,47 @@ Homestead.prototype = {
 		} catch(e) {
 			global.log(UUID + "::edit: " + e);
 		}
+	},
+
+	parseConfig: function() {
+		try {
+			let [res, out, err, status] = GLib.spawn_command_line_sync('cat ' + HOMESTEAD_CONFIG_FOLDER + "/Homestead.yaml");
+			ip = "";
+			memory = 0;
+			cpu = 0;
+			provider = "";
+			if(out.length != 0) {
+				matches = (new RegExp('ip:.*?"(.*?)"')).exec(out);
+				if (matches.length > 0) {
+					ip = matches[1];
+				}
+				matches = (new RegExp('memory:.*?(\\d+)')).exec(out);
+				if (matches.length > 0) {
+					memory = parseInt(matches[1], 10);
+				}
+				matches = (new RegExp('cpus:.*?(\\d+)')).exec(out);
+				if (matches.length > 0) {
+					cpu = parseInt(matches[1], 10);
+				}
+				matches = (new RegExp('provider:.*?(\\w+)')).exec(out);
+				if (matches.length > 0) {
+					provider = matches[1];
+				}
+			}
+
+			return {
+				ip: ip,
+				memory: memory,
+				cpu: cpu,
+				provider: provider,
+				sites: [
+				],
+				databases: [
+				]
+			}
+		} catch(e) {
+			global.log(e);
+		}
 	}
 
 }

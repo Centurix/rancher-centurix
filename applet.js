@@ -190,6 +190,7 @@ Rancher.prototype = {
 				this.set_applet_icon_path(ICON_UP);
 				this.set_applet_tooltip(_("Rancher: Homestead up."));
 				this.notification(_("Homestead up."));
+				text_status = _(" (Running)");
 			}
 
 			if (status == Homestead.STATUS_SAVED) {
@@ -200,6 +201,7 @@ Rancher.prototype = {
 			if (status == Homestead.STATUS_POWER_OFF) {
 				this.set_applet_tooltip(_("Rancher: Homestead down."));
 				this.notification(_("Homestead down."));
+				text_status = _(" (Down)");
 			}
 			if (status == Homestead.STATUS_NOT_CREATED) {
 				this.set_applet_tooltip(_("Rancher: Homestead not created."));
@@ -218,20 +220,41 @@ Rancher.prototype = {
 				this.menu.addMenuItem(this.newIconMenuItem('system-run', _('Run provisioning'), this.homesteadProvision));
 				this.menu.addMenuItem(this.newIconMenuItem('media-playback-pause', _('Suspend Homestead'), this.homesteadSuspend));
 				this.menu.addMenuItem(this.newIconMenuItem('utilities-terminal', _('SSH Terminal'), this.homesteadSSH));
+				this.menu.addMenuItem(this.newSeparator());
 			}
 			if (status != Homestead.STATUS_NOT_CREATED) {
 				this.menu.addMenuItem(this.newIconMenuItem('list-remove', _('Destroy Homestead'), this.homesteadDestroy));
 			}
 			this.menu.addMenuItem(this.newSeparator());
 			this.menu.addMenuItem(this.newIconMenuItem('accessories-text-editor', _('Edit Homestead configuration'), this.editHomestead));
-			// this.menu.addMenuItem(this.newMenuItem(_('Update Homestead box'), null, {reactive: false}));
 			this.menu.addMenuItem(this.newSeparator());
 			this.menu.addMenuItem(this.newIconMenuItem('view-refresh', _('Refresh this menu'), this.refreshApplet));
+
+			if (exists) {
+				this.menu.addMenuItem(this.newSeparator());
+				config = this.homestead.parseConfig();
+				this.subMenu = new PopupMenu.PopupSubMenuMenuItem(_('Configuration'));
+				this.subMenu.menu.addAction(_('- IP: ') + config.ip, null, {reactive: false});
+				this.subMenu.menu.addAction(_('- Memory: ') + config.memory, null, {reactive: false});
+				this.subMenu.menu.addAction(_('- CPU: ') + config.cpu, null, {reactive: false});
+				this.subMenu.menu.addAction(_('- Provider: ') + config.provider, null, {reactive: false});
+				this.menu.addMenuItem(this.subMenu);
+				this.subMenu = new PopupMenu.PopupSubMenuMenuItem(_('Hosted Sites'));
+				for (var index = 0; index < config.sites.length; index++) {
+					this.subMenu.menu.addAction(config.sites[index], null, {reactive: false});
+				}
+				this.menu.addMenuItem(this.subMenu);
+				this.subMenu = new PopupMenu.PopupSubMenuMenuItem(_('Hosted Databases'));
+				for (var index = 0; index < config.databases.length; index++) {
+					this.subMenu.menu.addAction(config.databases[index], null, {reactive: false});
+				}
+				this.menu.addMenuItem(this.subMenu);
+			}
 
 		} catch(e) {
 			global.log(UUID + "::updateMenu: " + e);
 		}
-	}
+	},
 }
 
 function main(metadata, orientation, panelHeight, instanceId) {
