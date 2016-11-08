@@ -125,7 +125,7 @@ TerminalReader.prototype = {
                }
             }
          } catch(e) {
-            global.log(e);
+            // global.log(e);
          }
       }));
    },
