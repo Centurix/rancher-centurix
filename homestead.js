@@ -1,6 +1,7 @@
 const TerminalReader = imports.applet.terminal_reader;
 const GLib = imports.gi.GLib;
 const Lang = imports.lang;
+const Main = imports.ui.main;
 
 const HOME = GLib.get_home_dir();
 
@@ -8,6 +9,8 @@ const HOMESTEAD_PROJECT_FOLDER = HOME + "/Homestead";
 const HOMESTEAD_CONFIG_FOLDER = HOME + "/.homestead";
 
 const VAGRANT_CMD = '/usr/bin/vagrant';
+
+const EDITOR = '/usr/bin/xed';
 
 const STATUS_RUNNING = 0;
 const STATUS_SAVED = 1;
@@ -54,7 +57,12 @@ Homestead.prototype = {
 	},
 
 	exists: function() {
-		return this.checkProjectExists() && this.checkConfigExists() && this.checkVagrantExists();
+		try {
+			return this.checkProjectExists() && this.checkConfigExists() && this.checkVagrantExists();
+		} catch(e) {
+			global.log(e);
+			return false;
+		}
 	},
 
 	checkStatus: function(callback) {
@@ -129,21 +137,26 @@ Homestead.prototype = {
 		this.vagrantExec(['suspend'], callback);
 	},
 
-	provision: function() {
-		this.vagrantExec(['provision']);
+	provision: function(callback) {
+		this.vagrantExec(['provision'], callback);
 	},
 
 	ssh: function() {
-		this.vagrantExec(['ssh']);
+		Main.Util.spawnCommandLine("gnome-terminal --working-directory=" + HOMESTEAD_PROJECT_FOLDER + " -x vagrant ssh");
 	},
 
 	edit: function() {
 		try {
-			GLib.spawn_async(HOMESTEAD_CONFIG_FOLDER, [EDITOR, HOMESTEAD_CONFIG_FOLDER + 'Homestead.yaml'], null, GLib.SpawnFlags.DEFAULT, null);
-			// GLib.spawn_sync(HOMESTEAD_CONFIG_FOLDER, [EDITOR, HOMESTEAD_CONFIG_FOLDER + 'Homestead.yaml'], null, GLib.SpawnFlags.DEFAULT, null);
+			GLib.spawn_async(
+				HOMESTEAD_CONFIG_FOLDER,
+				[EDITOR, HOMESTEAD_CONFIG_FOLDER + '/Homestead.yaml'],
+				null,
+				GLib.SpawnFlags.DEFAULT,
+				null
+			);
 		} catch(e) {
 			global.log(UUID + "::edit: " + e);
-		}		
+		}
 	}
 
 }
