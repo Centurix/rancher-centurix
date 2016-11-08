@@ -8,8 +8,18 @@ const Util = imports.applet.util;
 const MessageTray = imports.ui.messageTray;
 const Main = imports.ui.main;
 const St = imports.gi.St;
+const GLib = imports.gi.GLib;
 
 const UUID = "rancher@centurix";
+
+const HOME = GLib.get_home_dir();
+
+const HOMESTEAD_PROJECT_FOLDER = HOME + "/Homestead";
+const HOMESTEAD_CONFIG_FOLDER = HOME + "/.homestead";
+
+const VAGRANT_CMD = '/usr/bin/vagrant';
+
+const EDITOR = '/usr/bin/xed';
 
 const APPLET_FOLDER = global.userdatadir + "/applets/rancher@centurix/";
 
@@ -38,15 +48,46 @@ Rancher.prototype = {
 			this._msgsrc = new MessageTray.SystemNotificationSource("Rancher");
 			Main.messageTray.add(this._msgsrc);
 
-			// this.settings.bindProperty(
-			// 	Settings.BindingDirection.IN, 
-			// 	KEY_UPDATE,
-			// 	AUTOUPDATE,
-			// 	this.onSwitchAutoUpdate, 
-			// 	null
-			// );
+			this.homestead_project_folder = HOMESTEAD_PROJECT_FOLDER;
+			this.homestead_config_folder = HOMESTEAD_CONFIG_FOLDER;
+			this.vagrant_cmd = VAGRANT_CMD;
+			this.editor = EDITOR;
+
+			this.settings.bindProperty(
+				Settings.BindingDirection.IN, 
+				"homesteadProjectFolder",
+				"homestead_project_folder",
+				this.onProjectFolderUpdate, 
+				null
+			);
+			this.settings.bindProperty(
+				Settings.BindingDirection.IN, 
+				"homesteadConfigFolder",
+				"homestead_config_folder",
+				this.onConfigFolderUpdate, 
+				null
+			);
+			this.settings.bindProperty(
+				Settings.BindingDirection.IN, 
+				"vagrantCmd",
+				"vagrant_cmd",
+				this.onVagrantCmdUpdate, 
+				null
+			);
+			this.settings.bindProperty(
+				Settings.BindingDirection.IN, 
+				"editor",
+				"editor",
+				this.onEditorUpdate, 
+				null
+			);
 			this.settingsApiCheck();
-			this.homestead = new Homestead.Homestead();
+			this.homestead = new Homestead.Homestead(
+				this.homestead_project_folder, 
+				this.homestead_config_folder, 
+				this.vagrant_cmd, 
+				this.editor
+			);
 
 			this.refreshApplet();
 		} catch (e) {
@@ -54,15 +95,31 @@ Rancher.prototype = {
 		}
 	},
 
+	onProjectFolderUpdate: function() {
+		this.homestead.setProjectFolder(this.homestead_project_folder);
+	},
+
+	onConfigFolderUpdate: function() {
+		this.homestead.setConfigFolder(this.homestead_config_folder);
+	},
+
+	onVagrantCmdUpdate: function() {
+		this.homestead.setVagrantCmd(this.vagrant_cmd);
+	},
+
+	onEditorUpdate: function() {
+		this.homestead.setEditor(this.editor);
+	},
+
 	newIconMenuItem: function(icon, label, callback, options = {}) {
 		try {
-			let newItem = new PopupMenu.PopupIconMenuItem(label, icon, St.IconType.FULLCOLOR);
+			let newItem = new PopupMenu.PopupIconMenuItem(label, icon, St.IconType.FULLCOLOR, options);
 			if (callback) {
 				newItem.connect("activate", Lang.bind(this, callback));
 			}
 			return newItem;
 		} catch(e) {
-			global.log(e);
+			global.log(UUID + "::newIconMenuItem: " + e);
 		}
 	},
 
@@ -131,7 +188,7 @@ Rancher.prototype = {
 			this.homestead.halt(Lang.bind(this, this.refreshApplet));
 			this.notification(_("Taking Homestead down..."));
 		} catch(e) {
-			global.log(e);
+			global.log(UUID + '::homesteadToggle: ' + e);
 		}
 	},
 
@@ -173,6 +230,17 @@ Rancher.prototype = {
 		this.set_applet_tooltip(message);
 		this.menu.removeAll();
 		this.menu.addMenuItem(this.newIconMenuItem('dialog-information', message, null, {reactive: false}));
+	},
+
+	openBrowser: function(url) {
+		matches = (new RegExp('\\("(.*?)"\\)')).exec(url);
+		if (matches && matches.length > 0) {
+	        Main.Util.spawnCommandLine("xdg-open http://" + matches[1]);
+		}
+	},
+
+	editHosts: function() {
+		Main.Util.spawnCommandLine("gksudo gedit /etc/hosts");
 	},
 
 	updateApplet: function(exists, status) {
@@ -233,22 +301,34 @@ Rancher.prototype = {
 			if (exists) {
 				this.menu.addMenuItem(this.newSeparator());
 				config = this.homestead.parseConfig();
-				this.subMenu = new PopupMenu.PopupSubMenuMenuItem(_('Configuration'));
-				this.subMenu.menu.addAction(_('- IP: ') + config.ip, null, {reactive: false});
-				this.subMenu.menu.addAction(_('- Memory: ') + config.memory, null, {reactive: false});
-				this.subMenu.menu.addAction(_('- CPU: ') + config.cpu, null, {reactive: false});
-				this.subMenu.menu.addAction(_('- Provider: ') + config.provider, null, {reactive: false});
-				this.menu.addMenuItem(this.subMenu);
-				this.subMenu = new PopupMenu.PopupSubMenuMenuItem(_('Hosted Sites'));
+
+				this.subMenuConfig = new PopupMenu.PopupSubMenuMenuItem(_('Configuration'));
+				this.subMenuConfig.menu.addMenuItem(this.newIconMenuItem('package_network', _('IP: ') + config.ip, null, {reactive: false}));
+				this.subMenuConfig.menu.addMenuItem(this.newIconMenuItem('media-memory', _('Memory: ') + config.memory, null, {reactive: false}));
+				this.subMenuConfig.menu.addMenuItem(this.newIconMenuItem('applications-electronics', _('CPU: ') + config.cpu, null, {reactive: false}));
+				this.subMenuConfig.menu.addMenuItem(this.newIconMenuItem('virtualbox', _('Provider: ') + config.provider, null, {reactive: false}));
+				this.menu.addMenuItem(this.subMenuConfig);
+
+				this.subMenuSites = new PopupMenu.PopupSubMenuMenuItem(_('Hosted Sites') + ' (' + config.sites.length + ')');
+				this.subMenuSites.menu.addMenuItem(this.newIconMenuItem('accessories-text-editor', _('Edit hosts file'), this.editHosts));
 				for (var index = 0; index < config.sites.length; index++) {
-					this.subMenu.menu.addAction(config.sites[index], null, {reactive: false});
+					if (status == Homestead.STATUS_RUNNING) {
+						this.subMenuSites.menu.addMenuItem(this.newIconMenuItem('emblem-web', config.sites[index], this.openBrowser));
+					} else {
+						this.subMenuSites.menu.addMenuItem(this.newIconMenuItem('emblem-web', config.sites[index] + " (down)", null, {reactive: false}));
+					}
 				}
-				this.menu.addMenuItem(this.subMenu);
-				this.subMenu = new PopupMenu.PopupSubMenuMenuItem(_('Hosted Databases'));
+				this.menu.addMenuItem(this.subMenuSites);
+
+				this.subMenuDatabases = new PopupMenu.PopupSubMenuMenuItem(_('Hosted Databases') + ' (' + config.databases.length + ')');
 				for (var index = 0; index < config.databases.length; index++) {
-					this.subMenu.menu.addAction(config.databases[index], null, {reactive: false});
+					if (status == Homestead.STATUS_RUNNING) {
+						this.subMenuDatabases.menu.addMenuItem(this.newIconMenuItem('drive-harddisk', config.databases[index], null, {reactive: false}));
+					} else {
+						this.subMenuDatabases.menu.addMenuItem(this.newIconMenuItem('drive-harddisk', config.databases[index] + " (down)", null, {reactive: false}));
+					}
 				}
-				this.menu.addMenuItem(this.subMenu);
+				this.menu.addMenuItem(this.subMenuDatabases);
 			}
 
 		} catch(e) {

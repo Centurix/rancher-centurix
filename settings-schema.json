@@ -1,21 +1,23 @@
 {
 	"homesteadProjectFolder": {
-		"type": "entry",
-		"default": "/Homestead",
-		"description": "Homestead project folder"
+		"type": "filechooser",
+		"default": "/home/chris/Homestead",
+		"description": "Homestead project folder",
+		"select-dir": true
 	},
 	"homesteadConfigFolder": {
-		"type": "entry",
-		"default": "/.homestead",
-		"description": "Homestead config folder"
+		"type": "filechooser",
+		"default": "/home/chris/.homestead",
+		"description": "Homestead config folder",
+		"select-dir": true
 	},
 	"vagrantCmd": {
-		"type": "entry",
+		"type": "filechooser",
 		"default": "/usr/bin/vagrant",
 		"description": "Vagrant command"
 	},
 	"editor": {
-		"type": "entry",
+		"type": "filechooser",
 		"default": "/usr/bin/xed",
 		"description": "Default text editor"
 	}

@@ -2,15 +2,7 @@ const TerminalReader = imports.applet.terminal_reader;
 const GLib = imports.gi.GLib;
 const Lang = imports.lang;
 const Main = imports.ui.main;
-
-const HOME = GLib.get_home_dir();
-
-const HOMESTEAD_PROJECT_FOLDER = HOME + "/Homestead";
-const HOMESTEAD_CONFIG_FOLDER = HOME + "/.homestead";
-
-const VAGRANT_CMD = '/usr/bin/vagrant';
-
-const EDITOR = '/usr/bin/xed';
+const HomesteadYamlReader = imports.applet.homestead_yaml_reader;
 
 const STATUS_RUNNING = 0;
 const STATUS_SAVED = 1;
@@ -20,20 +12,41 @@ const STATUS_NOT_CREATED = 3;
 /**
  * Homestead/Vagrant manager
  */
-function Homestead() {
-	this._init();
+function Homestead(project_folder, config_folder, vagrant_cmd, editor) {
+	this._init(project_folder, config_folder, vagrant_cmd, editor);
 }
 
 Homestead.prototype = {
-	_init: function() {
+	_init: function(project_folder, config_folder, vagrant_cmd, editor) {
+		this._project_folder = project_folder;
+		this._config_folder = config_folder;
+		this._vagrant_cmd = vagrant_cmd;
+		this._editor = editor;
+
 		this._up = null;
 		this._status_pause = null;
 		this._out = {};
 	},
 
+	setProjectFolder: function(folder) {
+		this._project_folder = folder;
+	},
+
+	setConfigFolder: function(folder) {
+		this._config_folder = folder;
+	},
+
+	setVagrantCmd: function(cmd) {
+		this._vagrant_cmd = cmd;
+	},
+
+	setEditor: function(editor) {
+		this._editor = editor;
+	},
+
 	checkProjectExists: function() {
 		try {
-			return GLib.file_test(HOMESTEAD_PROJECT_FOLDER + "/Vagrantfile", GLib.FileTest.EXISTS);
+			return GLib.file_test(this._project_folder + "/Vagrantfile", GLib.FileTest.EXISTS);
 		} catch(e) {
 			global.log(UUID + "::checkProjectExists: " + e);
 		}
@@ -41,7 +54,7 @@ Homestead.prototype = {
 
 	checkConfigExists: function() {
 		try {
-			return GLib.file_test(HOMESTEAD_CONFIG_FOLDER + "/Homestead.yaml", GLib.FileTest.EXISTS);
+			return GLib.file_test(this._config_folder + "/Homestead.yaml", GLib.FileTest.EXISTS);
 		} catch(e) {
 			global.log(UUID + "::checkConfigExists: " + e);
 		}
@@ -67,7 +80,7 @@ Homestead.prototype = {
 
 	checkStatus: function(callback) {
 		try {
-			reader = new TerminalReader.TerminalReader(HOMESTEAD_PROJECT_FOLDER, VAGRANT_CMD + ' status', Lang.bind(this, function (command, status, stdout) {
+			reader = new TerminalReader.TerminalReader(this._project_folder, this._vagrant_cmd + ' status', Lang.bind(this, function (command, status, stdout) {
 				reader.destroy();
 				if (new RegExp('running').test(stdout)) {
 					if (typeof callback == 'function') {
@@ -100,8 +113,8 @@ Homestead.prototype = {
 		callback = callback;
 		try {
 			let [exit, pid, stdin, stdout, stderr] = GLib.spawn_async_with_pipes(
-				HOMESTEAD_PROJECT_FOLDER,
-				[VAGRANT_CMD].concat(command),
+				this._project_folder,
+				[this._vagrant_cmd].concat(command),
 				null,
 				GLib.SpawnFlags.DO_NOT_REAP_CHILD,
 				null
@@ -142,14 +155,14 @@ Homestead.prototype = {
 	},
 
 	ssh: function() {
-		Main.Util.spawnCommandLine("gnome-terminal --working-directory=" + HOMESTEAD_PROJECT_FOLDER + " -x vagrant ssh");
+		Main.Util.spawnCommandLine("gnome-terminal --working-directory=" + this._project_folder + " -x vagrant ssh");
 	},
 
 	edit: function() {
 		try {
 			GLib.spawn_async(
-				HOMESTEAD_CONFIG_FOLDER,
-				[EDITOR, HOMESTEAD_CONFIG_FOLDER + '/Homestead.yaml'],
+				this._config_folder,
+				[this._editor, this._config_folder + '/Homestead.yaml'],
 				null,
 				GLib.SpawnFlags.DEFAULT,
 				null
@@ -161,39 +174,15 @@ Homestead.prototype = {
 
 	parseConfig: function() {
 		try {
-			let [res, out, err, status] = GLib.spawn_command_line_sync('cat ' + HOMESTEAD_CONFIG_FOLDER + "/Homestead.yaml");
-			ip = "";
-			memory = 0;
-			cpu = 0;
-			provider = "";
-			if(out.length != 0) {
-				matches = (new RegExp('ip:.*?"(.*?)"')).exec(out);
-				if (matches.length > 0) {
-					ip = matches[1];
-				}
-				matches = (new RegExp('memory:.*?(\\d+)')).exec(out);
-				if (matches.length > 0) {
-					memory = parseInt(matches[1], 10);
-				}
-				matches = (new RegExp('cpus:.*?(\\d+)')).exec(out);
-				if (matches.length > 0) {
-					cpu = parseInt(matches[1], 10);
-				}
-				matches = (new RegExp('provider:.*?(\\w+)')).exec(out);
-				if (matches.length > 0) {
-					provider = matches[1];
-				}
-			}
+			yaml = new HomesteadYamlReader.HomesteadYamlReader(this._config_folder + "/Homestead.yaml");
 
 			return {
-				ip: ip,
-				memory: memory,
-				cpu: cpu,
-				provider: provider,
-				sites: [
-				],
-				databases: [
-				]
+				ip: yaml.ip,
+				memory: yaml.memory,
+				cpu: yaml.cpu,
+				provider: yaml.provider,
+				sites: yaml.sites,
+				databases: yaml.databases
 			}
 		} catch(e) {
 			global.log(e);
