@@ -1,13 +1,13 @@
 {
 	"homesteadProjectFolder": {
 		"type": "filechooser",
-		"default": "/Homestead",
+		"default": "~/Homestead",
 		"description": "Homestead project folder",
 		"select-dir": true
 	},
 	"homesteadConfigFolder": {
 		"type": "filechooser",
-		"default": "/.homestead",
+		"default": "~/.homestead",
 		"description": "Homestead config folder",
 		"select-dir": true
 	},

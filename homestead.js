@@ -2,6 +2,7 @@ const TerminalReader = imports.applet.terminal_reader;
 const GLib = imports.gi.GLib;
 const Lang = imports.lang;
 const Main = imports.ui.main;
+const Util = imports.applet.util;
 const HomesteadYamlReader = imports.applet.homestead_yaml_reader;
 
 const STATUS_RUNNING = 0;
@@ -46,7 +47,7 @@ Homestead.prototype = {
 
 	checkProjectExists: function() {
 		try {
-			return GLib.file_test(this._project_folder + "/Vagrantfile", GLib.FileTest.EXISTS);
+			return GLib.file_test(Util.resolveHome(this._project_folder) + "/Vagrantfile", GLib.FileTest.EXISTS);
 		} catch(e) {
 			global.log(UUID + "::checkProjectExists: " + e);
 		}
@@ -54,7 +55,7 @@ Homestead.prototype = {
 
 	checkConfigExists: function() {
 		try {
-			return GLib.file_test(this._config_folder + "/Homestead.yaml", GLib.FileTest.EXISTS);
+			return GLib.file_test(Util.resolveHome(this._config_folder) + "/Homestead.yaml", GLib.FileTest.EXISTS);
 		} catch(e) {
 			global.log(UUID + "::checkConfigExists: " + e);
 		}
@@ -80,7 +81,7 @@ Homestead.prototype = {
 
 	checkStatus: function(callback) {
 		try {
-			reader = new TerminalReader.TerminalReader(this._project_folder, this._vagrant_cmd + ' status', Lang.bind(this, function (command, status, stdout) {
+			reader = new TerminalReader.TerminalReader(Util.resolveHome(this._project_folder), this._vagrant_cmd + ' status', Lang.bind(this, function (command, status, stdout) {
 				reader.destroy();
 				if (new RegExp('running').test(stdout)) {
 					if (typeof callback == 'function') {
@@ -113,7 +114,7 @@ Homestead.prototype = {
 		callback = callback;
 		try {
 			let [exit, pid, stdin, stdout, stderr] = GLib.spawn_async_with_pipes(
-				this._project_folder,
+				Util.resolveHome(this._project_folder),
 				[this._vagrant_cmd].concat(command),
 				null,
 				GLib.SpawnFlags.DO_NOT_REAP_CHILD,
@@ -155,14 +156,14 @@ Homestead.prototype = {
 	},
 
 	ssh: function() {
-		Main.Util.spawnCommandLine("gnome-terminal --working-directory=" + this._project_folder + " -x vagrant ssh");
+		Main.Util.spawnCommandLine("gnome-terminal --working-directory=" + Util.resolveHome(this._project_folder) + " -x vagrant ssh");
 	},
 
 	edit: function() {
 		try {
 			GLib.spawn_async(
-				this._config_folder,
-				[this._editor, this._config_folder + '/Homestead.yaml'],
+				Util.resolveHome(this._config_folder),
+				[this._editor, Util.resolveHome(this._config_folder) + '/Homestead.yaml'],
 				null,
 				GLib.SpawnFlags.DEFAULT,
 				null
@@ -174,7 +175,7 @@ Homestead.prototype = {
 
 	parseConfig: function() {
 		try {
-			yaml = new HomesteadYamlReader.HomesteadYamlReader(this._config_folder + "/Homestead.yaml");
+			yaml = new HomesteadYamlReader.HomesteadYamlReader(Util.resolveHome(this._config_folder) + "/Homestead.yaml");
 
 			return {
 				ip: yaml.ip,

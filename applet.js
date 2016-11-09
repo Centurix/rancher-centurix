@@ -12,10 +12,8 @@ const GLib = imports.gi.GLib;
 
 const UUID = "rancher@centurix";
 
-const HOME = GLib.get_home_dir();
-
-const HOMESTEAD_PROJECT_FOLDER = HOME + "/Homestead";
-const HOMESTEAD_CONFIG_FOLDER = HOME + "/.homestead";
+const HOMESTEAD_PROJECT_FOLDER = "~/Homestead";
+const HOMESTEAD_CONFIG_FOLDER = "~/.homestead";
 
 const VAGRANT_CMD = '/usr/bin/vagrant';
 
