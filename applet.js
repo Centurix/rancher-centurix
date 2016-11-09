@@ -235,12 +235,12 @@ Rancher.prototype = {
 	openBrowser: function(url) {
 		matches = (new RegExp('\\("(.*?)"\\)')).exec(url);
 		if (matches && matches.length > 0) {
-	        Main.Util.spawnCommandLine("xdg-open http://" + matches[1]);
+			Main.Util.spawnCommandLine("xdg-open http://" + matches[1]);
 		}
 	},
 
 	editHosts: function() {
-		Main.Util.spawnCommandLine("gksudo gedit /etc/hosts");
+		Main.Util.spawnCommandLine("gksudo " + this.editor + " /etc/hosts");
 	},
 
 	updateApplet: function(exists, status) {
@@ -287,16 +287,12 @@ Rancher.prototype = {
 			if (status == Homestead.STATUS_RUNNING) {
 				this.menu.addMenuItem(this.newIconMenuItem('system-run', _('Run provisioning'), this.homesteadProvision));
 				this.menu.addMenuItem(this.newIconMenuItem('media-playback-pause', _('Suspend Homestead'), this.homesteadSuspend));
-				this.menu.addMenuItem(this.newIconMenuItem('utilities-terminal', _('SSH Terminal'), this.homesteadSSH));
+				this.menu.addMenuItem(this.newIconMenuItem('utilities-terminal', _('SSH Terminal...'), this.homesteadSSH));
 				this.menu.addMenuItem(this.newSeparator());
 			}
 			if (status != Homestead.STATUS_NOT_CREATED) {
 				this.menu.addMenuItem(this.newIconMenuItem('list-remove', _('Destroy Homestead'), this.homesteadDestroy));
 			}
-			this.menu.addMenuItem(this.newSeparator());
-			this.menu.addMenuItem(this.newIconMenuItem('accessories-text-editor', _('Edit Homestead configuration'), this.editHomestead));
-			this.menu.addMenuItem(this.newSeparator());
-			this.menu.addMenuItem(this.newIconMenuItem('view-refresh', _('Refresh this menu'), this.refreshApplet));
 
 			if (exists) {
 				this.menu.addMenuItem(this.newSeparator());
@@ -307,10 +303,12 @@ Rancher.prototype = {
 				this.subMenuConfig.menu.addMenuItem(this.newIconMenuItem('media-memory', _('Memory: ') + config.memory, null, {reactive: false}));
 				this.subMenuConfig.menu.addMenuItem(this.newIconMenuItem('applications-electronics', _('CPU: ') + config.cpu, null, {reactive: false}));
 				this.subMenuConfig.menu.addMenuItem(this.newIconMenuItem('virtualbox', _('Provider: ') + config.provider, null, {reactive: false}));
+				this.subMenuConfig.menu.addMenuItem(this.newSeparator());
+				this.subMenuConfig.menu.addMenuItem(this.newIconMenuItem('accessories-text-editor', _('Edit Homestead configuration...'), this.editHomestead));
 				this.menu.addMenuItem(this.subMenuConfig);
 
 				this.subMenuSites = new PopupMenu.PopupSubMenuMenuItem(_('Hosted Sites') + ' (' + config.sites.length + ')');
-				this.subMenuSites.menu.addMenuItem(this.newIconMenuItem('accessories-text-editor', _('Edit hosts file'), this.editHosts));
+				this.subMenuSites.menu.addMenuItem(this.newSeparator());
 				for (var index = 0; index < config.sites.length; index++) {
 					if (status == Homestead.STATUS_RUNNING) {
 						this.subMenuSites.menu.addMenuItem(this.newIconMenuItem('emblem-web', config.sites[index], this.openBrowser));
@@ -318,6 +316,8 @@ Rancher.prototype = {
 						this.subMenuSites.menu.addMenuItem(this.newIconMenuItem('emblem-web', config.sites[index] + " (down)", null, {reactive: false}));
 					}
 				}
+				this.subMenuSites.menu.addMenuItem(this.newSeparator());
+				this.subMenuSites.menu.addMenuItem(this.newIconMenuItem('accessories-text-editor', _('Edit hosts file...'), this.editHosts));
 				this.menu.addMenuItem(this.subMenuSites);
 
 				this.subMenuDatabases = new PopupMenu.PopupSubMenuMenuItem(_('Hosted Databases') + ' (' + config.databases.length + ')');
@@ -330,6 +330,9 @@ Rancher.prototype = {
 				}
 				this.menu.addMenuItem(this.subMenuDatabases);
 			}
+
+			this.menu.addMenuItem(this.newSeparator());
+			this.menu.addMenuItem(this.newIconMenuItem('view-refresh', _('Refresh this menu'), this.refreshApplet));
 
 		} catch(e) {
 			global.log(UUID + "::updateMenu: " + e);

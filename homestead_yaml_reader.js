@@ -6,7 +6,7 @@ function HomesteadYamlReader(yaml_file) {
 }
 
 /**
- * A VERY simple YAML reader for Homestead. It looks for very specific patterns.
+ * A VERY simple YAML reader for Homestead. It looks for very specific patterns. Supports scalars and simple blocks.
  */
 HomesteadYamlReader.prototype = {
 	_init: function(yaml_file) {
@@ -26,51 +26,41 @@ HomesteadYamlReader.prototype = {
 		let [ok, data, etag] = input_file.load_contents(null);
 		if (ok) {
 			lines = data.toString('utf-8').split('\n');
+
+			reBlockTest = new RegExp('^(\\w+):');
 			reIP = new RegExp('ip:.*?"(.*?)"');
 			reMemory = new RegExp('memory:.*?(\\d+)');
 			reCPU = new RegExp('cpus:.*?(\\d+)');
 			reProvider = new RegExp('provider:.*?(\\w+)');
-			reSites = new RegExp('sites:');
-			reDatabases = new RegExp('databases:');
 			reSiteCollectionItem = new RegExp('^\\s*-\\s*map:\\s*(.*)');
 			reDatabaseCollectionItem = new RegExp('^\\s*-\\s*(.*)');
+
 			currentSection = "";
+
 			for (var i = 0; i < lines.length; i++) {
-				matches = reIP.exec(lines[i]);
-				if (matches && matches.length > 0) {
-					this.ip = matches[1];
-					currentSection = "";
-				}
-				matches = reMemory.exec(lines[i]);
-				if (matches && matches.length > 0) {
-					this.memory = matches[1];
-					currentSection = "";
-				}
-				matches = reCPU.exec(lines[i]);
-				if (matches && matches.length > 0) {
-					this.cpu = matches[1];
-					currentSection = "";
-				}
-				matches = reProvider.exec(lines[i]);
-				if (matches && matches.length > 0) {
-					this.provider = matches[1];
-					currentSection = "";
-				}
-				if (reSites.test(lines[i])) {
-					currentSection = "sites";
-				}
-				if (reDatabases.test(lines[i])) {
-					currentSection = "databases";
-				}
-				matches = reSiteCollectionItem.exec(lines[i]);
-				if (matches && matches.length > 0 && currentSection == "sites") {
-					this.sites.push(matches[1]);
-				}
-				matches = reDatabaseCollectionItem.exec(lines[i]);
-				if (matches && matches.length > 0 && currentSection == "databases") {
-					this.databases.push(matches[1]);
-				}
+				currentSection = this._firstMatch(reBlockTest, lines[i], currentSection);
+				this.ip = this._firstMatch(reIP, lines[i], this.ip);
+				this.memory = this._firstMatch(reMemory, lines[i], this.memory);
+				this.cpu = this._firstMatch(reCPU, lines[i], this.cpu);
+				this.provider = this._firstMatch(reProvider, lines[i], this.provider);
+				this._pushToCollection(reSiteCollectionItem, lines[i], this.sites, "sites", currentSection);
+				this._pushToCollection(reDatabaseCollectionItem, lines[i], this.databases, "databases", currentSection);
 			}
+		}
+	},
+
+	_firstMatch: function(re, line, passthrough) {
+		matches = re.exec(line);
+		if (matches && matches.length > 0) {
+			return matches[1];
+		}
+		return passthrough;
+	},
+
+	_pushToCollection: function(re, line, collection, section, currentSection) {
+		matches = re.exec(line);
+		if (matches && matches.length > 0 && currentSection == section) {
+			collection.push(matches[1]);
 		}
 	}
 }
