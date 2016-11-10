@@ -213,6 +213,12 @@ Rancher.prototype = {
 		this.notification(_("Homestead SSH Terminal opened"));
 	},
 
+	homesteadRecompile: function() {
+		this.transitionMenu(_("Rancher: Recompiling Kernel, please wait..."), true);
+		this.homestead.recompile(Lang.bind(this, this.refreshApplet));
+		this.notification(_("Recompiling Kernel..."));
+	},
+
 	refreshApplet: function() {
 		this.homestead.checkStatus(Lang.bind(this, this.updateApplet));
 	},
@@ -223,11 +229,14 @@ Rancher.prototype = {
 		this._msgsrc.notify(notification);
 	},
 
-	transitionMenu: function(message) {
+	transitionMenu: function(message, refresh = false) {
 		this.set_applet_icon_path(ICON_DOWN);
 		this.set_applet_tooltip(message);
 		this.menu.removeAll();
 		this.menu.addMenuItem(this.newIconMenuItem('dialog-information', message, null, {reactive: false}));
+		if (refresh) {
+			this.menu.addMenuItem(this.newIconMenuItem('view-refresh', _('Refresh this menu'), this.refreshApplet));
+		}
 	},
 
 	openBrowser: function(url) {
@@ -251,6 +260,12 @@ Rancher.prototype = {
 			}
 
 			this.set_applet_icon_path(ICON_DOWN);
+
+			if (status == Homestead.STATUS_KERNAL_NOT_LOADED) {
+				this.set_applet_icon_path(ICON_MISSING);
+				this.set_applet_tooltip(_("Kernel Module not loaded. Needs recompilation."));
+				this.notification(_("Kernel Module not loaded. Needs recompilation."));
+			}
 
 			if (status == Homestead.STATUS_RUNNING) {
 				this.set_applet_icon_path(ICON_UP);
@@ -278,8 +293,16 @@ Rancher.prototype = {
 			this.menu.removeAll();
 			if (!exists) {
 				this.menu.addMenuItem(this.newIconMenuItem('apport', _('Homestead missing or not configured'), null, {reactive: false}));
+				this.menu.addMenuItem(this.newIconMenuItem('view-refresh', _('Refresh this menu'), this.refreshApplet));
 				return false;
 			}
+
+			if (status == Homestead.STATUS_KERNAL_NOT_LOADED) {
+				this.menu.addMenuItem(this.newIconMenuItem('apport', _('Kernel Module not loaded. Needs recompilation.'), null, {reactive: false}));
+				this.menu.addMenuItem(this.newIconMenuItem('system-run', _('Recompile Kernel Module.'), this.homesteadRecompile));
+				return false;
+			}
+
 			this.menu.addMenuItem(this.newSwitchMenuItem(_('Status') + text_status, (status == Homestead.STATUS_RUNNING), this.homesteadToggle));
 			this.menu.addMenuItem(this.newSeparator());
 			if (status == Homestead.STATUS_RUNNING) {
@@ -335,7 +358,7 @@ Rancher.prototype = {
 		} catch(e) {
 			global.log(UUID + "::updateMenu: " + e);
 		}
-	},
+	}
 }
 
 function main(metadata, orientation, panelHeight, instanceId) {
