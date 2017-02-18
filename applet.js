@@ -237,6 +237,10 @@ Rancher.prototype = {
 		}
 	},
 
+	openHomesteadGithub: function() {
+		Main.Util.spawnCommandLine("xdg-open http://laravel.com/docs/homestead");
+	},
+
 	editHosts: function() {
 		Main.Util.spawnCommandLine("gksudo " + this.editor + " /etc/hosts");
 	},
@@ -274,10 +278,22 @@ Rancher.prototype = {
 				this.notification(_("Homestead not created"));
 				text_status = _(" (Not created/Destroyed)");
 			}
+			if (status == Homestead.STATUS_HOMESTEAD_MISSING) {
+				this.set_applet_tooltip(_("Rancher: Homestead not installed."));
+				this.notification(_("Homestead not installed"));
+				text_status = _(" (Not created/Destroyed)");
+			}
 
 			this.menu.removeAll();
 			if (!exists) {
-				this.menu.addMenuItem(this.newIconMenuItem('apport', _('Homestead missing or not configured'), null, {reactive: false}));
+				if (status == Homestead.STATUS_HOMESTEAD_MISSING) {
+					this.menu.addMenuItem(this.newIconMenuItem('apport', _('Homestead not installed'), null, {reactive: false}));
+					this.menu.addMenuItem(this.newIconMenuItem('emblem-web', _('Click here for installation instructions'), this.openHomesteadGithub));
+					this.menu.addMenuItem(this.newIconMenuItem('view-refresh', _('Refresh this menu'), this.refreshApplet));					
+				} else {
+					this.menu.addMenuItem(this.newIconMenuItem('apport', _('Homestead missing or not configured'), null, {reactive: false}));
+					this.menu.addMenuItem(this.newIconMenuItem('view-refresh', _('Refresh this menu'), this.refreshApplet));					
+				}
 				return false;
 			}
 			this.menu.addMenuItem(this.newSwitchMenuItem(_('Status') + text_status, (status == Homestead.STATUS_RUNNING), this.homesteadToggle));

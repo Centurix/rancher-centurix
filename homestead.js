@@ -9,6 +9,7 @@ const STATUS_RUNNING = 0;
 const STATUS_SAVED = 1;
 const STATUS_POWER_OFF = 2;
 const STATUS_NOT_CREATED = 3;
+const STATUS_HOMESTEAD_MISSING = 4;
 
 /**
  * Homestead/Vagrant manager
@@ -101,6 +102,11 @@ Homestead.prototype = {
 				if (new RegExp('not created').test(stdout)) {
 					if (typeof callback == 'function') {
 						callback(this.exists(), STATUS_NOT_CREATED);
+					}
+				}
+				if (new RegExp('can\'t cd to').test(stdout)) {
+					if (typeof callback == 'function') {
+						callback(this.exists(), STATUS_HOMESTEAD_MISSING);
 					}
 				}
 			}));
