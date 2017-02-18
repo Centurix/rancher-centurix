@@ -10,6 +10,7 @@ const STATUS_SAVED = 1;
 const STATUS_POWER_OFF = 2;
 const STATUS_NOT_CREATED = 3;
 const STATUS_HOMESTEAD_MISSING = 4;
+const STATUS_KERNAL_NOT_LOADED = 5;
 
 /**
  * Homestead/Vagrant manager
@@ -109,6 +110,11 @@ Homestead.prototype = {
 						callback(this.exists(), STATUS_HOMESTEAD_MISSING);
 					}
 				}
+				if (new RegExp('VBoxManage --version').test(stdout)) {
+					if (typeof callback == 'function') {
+						callback(this.exists(), STATUS_KERNAL_NOT_LOADED);
+					}
+				}
 			}));
 			reader.executeReader();
 		} catch (e) {
@@ -159,6 +165,10 @@ Homestead.prototype = {
 
 	provision: function(callback) {
 		this.vagrantExec(['provision'], callback);
+	},
+
+	recompile: function(callback) {
+		Main.Util.spawnCommandLine("gnome-terminal --working-directory=" + Util.resolveHome(this._project_folder) + " -x sudo /sbin/rcvboxdrv setup");
 	},
 
 	ssh: function() {
