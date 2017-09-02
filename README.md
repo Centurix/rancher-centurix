@@ -1,6 +1,9 @@
 Homestead Manager Applet
 ========================
 
+** THIS APPLET IS NOW INCLUDED IN THE MAINLINE CINNAMON PROJECT AND AVAILABLE AS AN APPLET
+FROM THE CINNAMON APPLET MANAGER. **
+
 Manage an installed Homestead instance from a panel menu.
 
 Requirements
